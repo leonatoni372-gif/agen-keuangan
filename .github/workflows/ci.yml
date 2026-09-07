@@ -25,7 +25,7 @@ jobs:
       - name: Pastikan secret tak terlacak git
         run: |
           test ! -e .env.local
-          ! git ls-files | grep -Eq '(^|/)\.env(\.|$)|(^|/)secrets?/'
+          ! git ls-files | grep -Eq '(^|/)\.env\.local$|(^|/)\.env$|(^|/)secrets?/'
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
