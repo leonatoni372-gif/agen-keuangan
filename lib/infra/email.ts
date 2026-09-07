@@ -1,3 +1,5 @@
+// infra/email — kirim via Resend.
+
 import { Resend } from "resend";
 
 let _resend: Resend | null = null;
@@ -7,5 +9,4 @@ export function getResend() {
   return _resend;
 }
 
-export const ADMIN_EMAIL =
-  process.env.ADMIN_EMAIL || "leonatoni372@gmail.com";
+export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "leonatoni372@gmail.com";

@@ -1,4 +1,4 @@
-// Auth PIN stateless: cookie sid = HMAC(CRON_SECRET, "pin:"+PIN).
+// infra/auth — PIN stateless: cookie sid = HMAC(CRON_SECRET, "pin:"+PIN).
 // Tanpa DB/sesi — cocok untuk 1 pengguna. Web Crypto agar jalan di edge + node.
 
 const enc = new TextEncoder();

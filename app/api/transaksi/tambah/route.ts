@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { tambahTransaksi, validTransaksi } from "@/lib/toko";
+import { validTransaksi } from "@/lib/domain/transaksi";
+import { tambahTransaksi } from "@/lib/infra/toko";
 
 export async function POST(req: Request) {
   const v = validTransaksi(await req.json().catch(() => null));

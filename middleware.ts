@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { sidCocok } from "./lib/auth";
-import { boleh, ipDari } from "./lib/ratelimit";
+import { sidCocok } from "./lib/infra/auth";
+import { boleh, ipDari } from "./lib/infra/ratelimit";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { buatSid, pinCocok } from "@/lib/auth";
-import { boleh, ipDari } from "@/lib/ratelimit";
+import { buatSid, pinCocok } from "@/lib/infra/auth";
+import { boleh, ipDari } from "@/lib/infra/ratelimit";
 
 export async function POST(req: Request) {
   if (!boleh(`login:${ipDari(req.headers)}`, 5, 5 * 60 * 1000)) {

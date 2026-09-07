@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { bacaCatatan, sanitasiPath } from "@/lib/obsidian";
+import { bacaCatatan, sanitasiPath } from "@/lib/infra/obsidian";
 
 export async function GET(req: Request) {
   const rel = sanitasiPath(new URL(req.url).searchParams.get("path") ?? "");

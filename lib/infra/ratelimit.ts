@@ -1,4 +1,4 @@
-// Rate limit in-memory per instance.
+// infra/ratelimit — rate limit in-memory per instance.
 // ponytail: best-effort di serverless (tiap instance punya hitungan sendiri).
 // Cukup untuk pribadi; ganti KV/Upstash saat butuh batas global yang keras.
 
