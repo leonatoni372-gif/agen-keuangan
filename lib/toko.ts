@@ -29,7 +29,7 @@ export async function bacaTransaksi(): Promise<Transaksi[]> {
   // raw lebih cepat; fallback API kalau repo privat bermasalah
   const r = await fetch(`https://raw.githubusercontent.com/${VAULT_REPO}/main/${TOKO_PATH}`, {
     headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` },
-    next: { revalidate: 60 },
+    cache: "no-store",
   });
   if (!r.ok) {
     const cur = await githubGet(TOKO_PATH, VAULT_REPO).catch(() => null);
