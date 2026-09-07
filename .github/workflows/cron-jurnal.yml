@@ -1,0 +1,11 @@
+name: cron-jurnal
+on:
+  schedule:
+    - cron: "5 15 * * *"
+  workflow_dispatch:
+jobs:
+  tembak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: code=$(curl -s -o /tmp/resp.json -w "%{http_code}" -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" https://agen-keuangan.vercel.app/api/cron/jurnal-malam); cat /tmp/resp.json; echo; echo "http=$code"; test "$code" = "200"
