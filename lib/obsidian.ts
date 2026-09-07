@@ -133,8 +133,8 @@ export async function pushLaporanKeObsidian(o: {
     const dailyPath = `01-Daily/${o.tanggal}.md`;
     const cur = await githubGet(dailyPath).catch(() => null);
     const base = cur?.content ?? templateDaily(o.tanggal);
-    const namaFile = lapPath.split("/").pop();
-    if (!base.includes(namaFile!)) {
+    const namaFile = lapPath.split("/").pop()!.replace(/\.md$/, "");
+    if (!base.includes(namaFile)) {
       const rp = (n: number) => `Rp${Number(n).toLocaleString("id-ID")}`;
       const baris =
         `\n### 💰 ${hh}:00 WIB — ${o.tipe}\n` +
