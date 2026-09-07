@@ -5,6 +5,8 @@ import type { Transaksi } from "../domain/transaksi";
 
 const TOKO_PATH = "04-Keuangan/transaksi.json";
 const LOG_PATH = "laporan_log.json";
+// Log di branch sendiri: histori master bersih, CI tak terpicu tiap cron.
+const LOG_BRANCH = "log";
 
 export type EntriLog = { periode: string; tipe: string; penerima: string; status: string | null };
 
@@ -46,13 +48,17 @@ export async function hapusTransaksi(id: string): Promise<boolean> {
 
 export async function bacaLog(limit = 5): Promise<EntriLog[]> {
   if (!adaTokenGithub()) return [];
-  const cur = await githubGet(LOG_PATH, APP_REPO).catch(() => null);
+  const cur = await githubGet(LOG_PATH, APP_REPO, LOG_BRANCH).catch(() => null);
   const rows = cur ? aman<EntriLog>(JSON.parse(cur.content)) : [];
   return rows.slice(-limit).reverse();
 }
 
 export async function catatLog(e: EntriLog): Promise<void> {
-  await ubahGithub<EntriLog[]>(APP_REPO, LOG_PATH, `log: ${e.tipe} ${e.periode.slice(0, 16)}`, (cur) =>
-    [...aman<EntriLog>(cur), e].slice(-200)
+  await ubahGithub<EntriLog[]>(
+    APP_REPO,
+    LOG_PATH,
+    `log: ${e.tipe} ${e.periode.slice(0, 16)}`,
+    (cur) => [...aman<EntriLog>(cur), e].slice(-200),
+    LOG_BRANCH
   ).catch((err) => console.error("catatLog gagal:", err instanceof Error ? err.message : err));
 }

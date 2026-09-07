@@ -17,9 +17,10 @@ const head = () => ({
 
 export async function githubGet(
   pathInRepo: string,
-  repo = VAULT_REPO
+  repo = VAULT_REPO,
+  ref?: string
 ): Promise<{ sha: string; content: string } | null> {
-  const r = await fetch(urlIsi(repo, pathInRepo), { headers: head() });
+  const r = await fetch(urlIsi(repo, pathInRepo) + (ref ? `?ref=${ref}` : ""), { headers: head() });
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`github GET ${r.status}`);
   const j = (await r.json()) as { sha: string; content?: string };
@@ -49,20 +50,23 @@ export async function pushKeGithub(
 }
 
 // Tulis baca-ubah-tulis + 1x retry kalau sha basi (tulis barengan).
+// branch opsional: dibuat otomatis saat belum ada (mis. "log" khusus data).
 export async function ubahGithub<T>(
   repo: string,
   pathInRepo: string,
   message: string,
-  fn: (cur: T | null) => T
+  fn: (cur: T | null) => T,
+  branch?: string
 ): Promise<T> {
   for (let i = 0; i < 2; i++) {
-    const cur = await githubGet(pathInRepo, repo).catch(() => null);
+    const cur = await githubGet(pathInRepo, repo, branch).catch(() => null);
     const next = fn(cur ? (JSON.parse(cur.content) as T) : null);
     try {
       const body: Record<string, unknown> = {
         message,
         content: Buffer.from(JSON.stringify(next), "utf8").toString("base64"),
         ...(cur ? { sha: cur.sha } : {}),
+        ...(branch ? { branch } : {}),
       };
       const r = await fetch(urlIsi(repo, pathInRepo), {
         method: "PUT",
