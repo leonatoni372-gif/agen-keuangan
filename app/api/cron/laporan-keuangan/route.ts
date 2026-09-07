@@ -2,6 +2,16 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ADMIN_EMAIL, getResend } from "@/lib/email";
 import { getWibHour, jadwalUntukJam } from "@/lib/waktu";
+import { pushLaporanKeObsidian } from "@/lib/obsidian";
+
+function tanggalWib(date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
 
 type Transaksi = {
   id: string;
@@ -110,16 +120,27 @@ export async function GET(req: Request) {
     ],
   });
 
+  // 5. Push ke Obsidian (via GitHub; gagal = catat saja, email tetap prioritas)
+  const sumJenis = (j: string) =>
+    csvRows.filter((t) => t.jenis === j).reduce((a, t) => a + Number(t.nominal), 0);
+  const obsidian = await pushLaporanKeObsidian({
+    tipe: type,
+    wibHour,
+    tanggal: tanggalWib(now),
+    rows: csvRows,
+    ringkas: { masuk: sumJenis("pemasukan"), keluar: sumJenis("pengeluaran") },
+  });
+
   await supabase.from("laporan_log").insert({
     periode: now.toISOString(),
     tipe: type,
     penerima: ADMIN_EMAIL,
-    status: error ? `gagal: ${error.message}` : `terkirim jam ${wibHour} WIB`,
+    status: error ? `gagal: ${error.message}` : `terkirim jam ${wibHour} WIB | ${obsidian}`,
   });
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, type, wibHour, rows: csvRows.length });
+  return NextResponse.json({ ok: true, type, wibHour, rows: csvRows.length, obsidian });
 }
 
 // ponytail: single hourly cron + filter WIB, split ke 12 cron saat Vercel limit berubah

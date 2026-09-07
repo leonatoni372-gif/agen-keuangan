@@ -1,17 +1,34 @@
 import { createClient } from "@/lib/supabase/server";
+import { obsidianUrl, VAULT_NAME } from "@/lib/obsidian";
 
 export default async function KeuanganPage() {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data: transaksi } = await supabase
     .from("transaksi")
     .select("id,jenis,kategori,nominal,tanggal,catatan")
     .order("tanggal", { ascending: false })
     .limit(20);
+  const { data: log } = await supabase
+    .from("laporan_log")
+    .select("periode,tipe,status")
+    .order("periode", { ascending: false })
+    .limit(5);
 
   return (
-    <main style={{ padding: 32, maxWidth: 800 }}>
+    <main style={{ padding: 32, maxWidth: 800, fontFamily: "system-ui" }}>
       <h1>Keuangan — 20 transaksi terakhir</h1>
-      <pre>{JSON.stringify(data ?? [], null, 2)}</pre>
+      <p>
+        Vault: <b>{VAULT_NAME}</b> ·{" "}
+        <a href={obsidianUrl("04-Keuangan/Keuangan")}>Buka Keuangan di Obsidian</a> ·{" "}
+        <a href="https://github.com/leonatoni372-gif/alter-brain/tree/main/04-Keuangan">
+          Folder Keuangan di GitHub
+        </a> ·{" "}
+        <a href="/api/obsidian/baca?path=Home.md">Baca Home.md (API)</a>
+      </p>
+      <h2>Laporan terakhir (termasuk status Obsidian)</h2>
+      <pre>{JSON.stringify(log ?? [], null, 2)}</pre>
+      <h2>Transaksi</h2>
+      <pre>{JSON.stringify(transaksi ?? [], null, 2)}</pre>
     </main>
   );
 }
