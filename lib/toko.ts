@@ -26,16 +26,9 @@ const aman = <T,>(rows: unknown): T[] => (Array.isArray(rows) ? (rows as T[]) : 
 
 export async function bacaTransaksi(): Promise<Transaksi[]> {
   if (!adaTokenGithub()) return [];
-  // raw lebih cepat; fallback API kalau repo privat bermasalah
-  const r = await fetch(`https://raw.githubusercontent.com/${VAULT_REPO}/main/${TOKO_PATH}`, {
-    headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` },
-    cache: "no-store",
-  });
-  if (!r.ok) {
-    const cur = await githubGet(TOKO_PATH, VAULT_REPO).catch(() => null);
-    return cur ? aman<Transaksi>(JSON.parse(cur.content)) : [];
-  }
-  return aman<Transaksi>(await r.json());
+  // via Contents API (raw.githubusercontent cache-nya bandel untuk tulis-baca cepat)
+  const cur = await githubGet(TOKO_PATH, VAULT_REPO).catch(() => null);
+  return cur ? aman<Transaksi>(JSON.parse(cur.content)) : [];
 }
 
 export function validTransaksi(b: unknown): { ok: boolean; data?: Omit<Transaksi, "id" | "created_at">; error?: string } {
