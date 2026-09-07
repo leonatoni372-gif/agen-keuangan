@@ -5,6 +5,7 @@ import path from "path";
 
 const REPO = process.env.GITHUB_REPO || "leonatoni372-gif/alter-brain";
 const TOKEN = () => process.env.GITHUB_TOKEN || "";
+export const adaTokenGithub = () => TOKEN() !== "";
 const VAULT = () =>
   process.env.OBSIDIAN_VAULT_PATH || String.raw`D:\ALTER BRAIN`;
 
@@ -58,8 +59,8 @@ ${tabel || "| - | - | - | - | - |"}
   return { path: path_, md };
 }
 
-async function githubGet(pathInRepo: string): Promise<{ sha: string; content: string } | null> {
-  const r = await fetch(`https://api.github.com/repos/${REPO}/contents/${encodeURIComponent(pathInRepo).replace(/%2F/g, "/")}`, {
+export async function githubGet(pathInRepo: string, repo = REPO): Promise<{ sha: string; content: string } | null> {
+  const r = await fetch(`https://api.github.com/repos/${repo}/contents/${encodeURIComponent(pathInRepo).replace(/%2F/g, "/")}`, {
     headers: { Authorization: `Bearer ${TOKEN()}`, Accept: "application/vnd.github+json" },
   });
   if (r.status === 404) return null;
@@ -69,20 +70,46 @@ async function githubGet(pathInRepo: string): Promise<{ sha: string; content: st
   return { sha: j.sha, content };
 }
 
-export async function pushKeGithub(pathInRepo: string, content: string, message: string) {
-  const cur = await githubGet(pathInRepo).catch(() => null);
+export async function pushKeGithub(pathInRepo: string, content: string, message: string, repo = REPO) {
+  const cur = await githubGet(pathInRepo, repo).catch(() => null);
   const body: Record<string, unknown> = {
     message,
     content: Buffer.from(content, "utf8").toString("base64"),
     ...(cur ? { sha: cur.sha } : {}),
   };
-  const r = await fetch(`https://api.github.com/repos/${REPO}/contents/${encodeURIComponent(pathInRepo).replace(/%2F/g, "/")}`, {
+  const r = await fetch(`https://api.github.com/repos/${repo}/contents/${encodeURIComponent(pathInRepo).replace(/%2F/g, "/")}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${TOKEN()}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`github PUT ${r.status}: ${(await r.text()).slice(0, 200)}`);
   return cur ? "updated" : "created";
+}
+
+// Tulis dengan transform baca-ubah-tulis + 1x retry kalau sha basi (tulis barengan).
+export async function ubahGithub<T>(repo: string, pathInRepo: string, message: string, fn: (cur: T | null) => T): Promise<T> {
+  for (let i = 0; i < 2; i++) {
+    const cur = await githubGet(pathInRepo, repo).catch(() => null);
+    const next = fn(cur ? (JSON.parse(cur.content) as T) : null);
+    try {
+      const body: Record<string, unknown> = {
+        message,
+        content: Buffer.from(JSON.stringify(next), "utf8").toString("base64"),
+        ...(cur ? { sha: cur.sha } : {}),
+      };
+      const r = await fetch(`https://api.github.com/repos/${repo}/contents/${encodeURIComponent(pathInRepo).replace(/%2F/g, "/")}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${TOKEN()}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (r.status === 409 || r.status === 422) continue; // sha basi, coba sekali lagi
+      if (!r.ok) throw new Error(`github PUT ${r.status}`);
+      return next;
+    } catch (e) {
+      if (i === 1) throw e;
+    }
+  }
+  throw new Error("github tulis gagal setelah retry");
 }
 
 function templateDaily(tanggal: string): string {

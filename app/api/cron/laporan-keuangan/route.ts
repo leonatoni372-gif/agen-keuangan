@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { ADMIN_EMAIL, getResend } from "@/lib/email";
 import { getWibHour, jadwalUntukJam } from "@/lib/waktu";
 import { pushLaporanKeObsidian } from "@/lib/obsidian";
+import { bacaTransaksi, catatLog, type Transaksi } from "@/lib/toko";
 
 function tanggalWib(date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -12,15 +12,6 @@ function tanggalWib(date = new Date()): string {
     day: "2-digit",
   }).format(date);
 }
-
-type Transaksi = {
-  id: string;
-  jenis: string;
-  kategori: string | null;
-  nominal: number;
-  tanggal: string;
-  catatan: string | null;
-};
 
 function toCsv(rows: Transaksi[]): string {
   const head = "id,jenis,kategori,nominal,tanggal,catatan";
@@ -46,61 +37,25 @@ export async function GET(req: Request) {
   const now = new Date();
   const wibHour = getWibHour(now);
   const { run, type } = jadwalUntukJam(wibHour);
-  const supabase = createAdminClient();
 
   if (!run) {
-    await supabase.from("laporan_log").insert({
-      periode: now.toISOString(),
-      tipe: "SKIP",
-      penerima: ADMIN_EMAIL,
-      status: `skip jam ${wibHour} WIB`,
-    });
+    await catatLog({ periode: now.toISOString(), tipe: "SKIP", penerima: ADMIN_EMAIL, status: `skip jam ${wibHour} WIB` });
     return NextResponse.json({ skipped: true, wibHour });
   }
 
-  // 3. Query: rutin = 2 jam terakhir, rekap = hari ini 00:00 WIB s/d now
+  // 3. Sumber: toko JSON GitHub, filter in-memory (rutin = 2 jam terakhir, rekap = hari ini WIB)
+  const semua = (await bacaTransaksi()).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   const twoHoursAgo = new Date(now.getTime() - 2 * 3600 * 1000).toISOString();
-  const { data: delta } = await supabase
-    .from("transaksi")
-    .select("id,jenis,kategori,nominal,tanggal,catatan")
-    .gte("created_at", twoHoursAgo)
-    .order("created_at", { ascending: false })
-    .limit(500);
+  let csvRows = semua.filter((t) => t.created_at >= twoHoursAgo).slice(0, 500);
 
   let rekapHtml = "";
-  let csvRows: Transaksi[] = (delta as Transaksi[]) ?? [];
-
   if (type === "REKAP") {
-    // awal hari WIB dalam UTC
-    const wibNow = new Date(
-      now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" })
-    );
-    const startWib = new Date(wibNow);
-    startWib.setHours(0, 0, 0, 0);
-    const offsetMs = 7 * 3600 * 1000; // WIB = UTC+7
-    const startUtc = new Date(startWib.getTime() - offsetMs).toISOString();
-
-    const { data: today } = await supabase
-      .from("transaksi")
-      .select("jenis,nominal")
-      .gte("created_at", startUtc);
-    const sum = (j: string) =>
-      (today ?? []).filter((t) => t.jenis === j).reduce((a, t) => a + Number(t.nominal), 0);
-    rekapHtml = `<h3>Rekap harian 00:00–${wibHour}:00 WIB</h3><ul><li>Pemasukan: Rp${sum(
-      "pemasukan"
-    ).toLocaleString("id-ID")}</li><li>Pengeluaran: Rp${sum(
-      "pengeluaran"
-    ).toLocaleString("id-ID")}</li><li>Saldo hari: Rp${(
-      sum("pemasukan") - sum("pengeluaran")
-    ).toLocaleString("id-ID")}</li></ul>`;
-
-    const { data: full } = await supabase
-      .from("transaksi")
-      .select("id,jenis,kategori,nominal,tanggal,catatan")
-      .gte("created_at", startUtc)
-      .order("created_at", { ascending: false })
-      .limit(1000);
-    csvRows = (full as Transaksi[]) ?? [];
+    const hari = tanggalWib(now);
+    const full = semua.filter((t) => t.created_at >= new Date(`${hari}T00:00:00+07:00`).toISOString()).slice(0, 1000);
+    const sum = (j: string) => full.filter((t) => t.jenis === j).reduce((a, t) => a + Number(t.nominal), 0);
+    const rp = (n: number) => n.toLocaleString("id-ID");
+    rekapHtml = `<h3>Rekap harian 00:00–${wibHour}:00 WIB</h3><ul><li>Pemasukan: Rp${rp(sum("pemasukan"))}</li><li>Pengeluaran: Rp${rp(sum("pengeluaran"))}</li><li>Saldo hari: Rp${rp(sum("pemasukan") - sum("pengeluaran"))}</li></ul>`;
+    csvRows = full;
   }
 
   // 4. Kirim email
@@ -131,7 +86,7 @@ export async function GET(req: Request) {
     ringkas: { masuk: sumJenis("pemasukan"), keluar: sumJenis("pengeluaran") },
   });
 
-  await supabase.from("laporan_log").insert({
+  await catatLog({
     periode: now.toISOString(),
     tipe: type,
     penerima: ADMIN_EMAIL,
@@ -143,5 +98,4 @@ export async function GET(req: Request) {
   return NextResponse.json({ ok: true, type, wibHour, rows: csvRows.length, obsidian });
 }
 
-// ponytail: single hourly cron + filter WIB, split ke 12 cron saat Vercel limit berubah
 export const dynamic = "force-dynamic";

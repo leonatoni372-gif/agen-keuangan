@@ -1,18 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { bacaTransaksi, bacaLog } from "@/lib/toko";
 import { obsidianUrl, VAULT_NAME } from "@/lib/obsidian";
+import FormTransaksi from "./form";
 
 export default async function KeuanganPage() {
-  const supabase = await createClient();
-  const { data: transaksi } = await supabase
-    .from("transaksi")
-    .select("id,jenis,kategori,nominal,tanggal,catatan")
-    .order("tanggal", { ascending: false })
-    .limit(20);
-  const { data: log } = await supabase
-    .from("laporan_log")
-    .select("periode,tipe,status")
-    .order("periode", { ascending: false })
-    .limit(5);
+  const transaksi = (await bacaTransaksi().catch(() => [])).slice(0, 20);
+  const log = await bacaLog(5).catch(() => []);
 
   return (
     <main style={{ padding: 32, maxWidth: 800, fontFamily: "system-ui" }}>
@@ -25,10 +17,11 @@ export default async function KeuanganPage() {
         </a> ·{" "}
         <a href="/api/obsidian/baca?path=Home.md">Baca Home.md (API)</a>
       </p>
+      <FormTransaksi />
       <h2>Laporan terakhir (termasuk status Obsidian)</h2>
-      <pre>{JSON.stringify(log ?? [], null, 2)}</pre>
+      <pre>{JSON.stringify(log, null, 2)}</pre>
       <h2>Transaksi</h2>
-      <pre>{JSON.stringify(transaksi ?? [], null, 2)}</pre>
+      <pre>{JSON.stringify(transaksi, null, 2)}</pre>
     </main>
   );
 }
